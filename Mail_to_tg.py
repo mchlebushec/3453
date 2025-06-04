@@ -45,7 +45,7 @@ def extract_parts_from_text(text):
     lines = [': '.join(i.split(': ')[1:]) for i in text.splitlines() if i.count(':') >= 1]
 
     # Выделение нужной части сообщения
-    text = f'{lines[0]} {lines[1]}, {lines[2]}, {lines[3]}, {lines[6]}чел. Детское кресло / Бустер: {lines[10]}'
+    text = f'{lines[1]} {lines[2]}, {lines[3]}, {lines[4]}, {lines[6]}чел. Детское кресло / Бустер: {lines[10]}'
 
     return text  # Если нужно будет через запятую, изменить /n на ,
 
