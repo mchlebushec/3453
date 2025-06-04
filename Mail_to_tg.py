@@ -32,7 +32,8 @@ def get_email_body(msg):
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
-            if content_type == "text/plain":
+            print(content_type)
+            if content_type == "text/html":
                 body = part.get_payload(decode=True)
                 return clean_text(body)
     else:
@@ -41,22 +42,12 @@ def get_email_body(msg):
     return ""
 
 def extract_parts_from_text(text):
-    lines = text.splitlines()
-    def safe_cut(i, pos, suffix=''):
-        if len(lines) > i:
-            line = lines[i]
-            return line[pos:] + suffix if len(line) > pos else suffix.strip()
-        return suffix.strip()
+    lines = [': '.join(i.split(': ')[1:]) for i in text.splitlines() if i.count(':') >= 1]
 
     # Выделение нужной части сообщения
-    parts = [
-        safe_cut(1, 14),
-        safe_cut(2, 40),
-        safe_cut(3, 67),
-        safe_cut(4, 13),
-        safe_cut(6, 20, ' чел.')
-    ]
-    return '\n'.join(parts)  # Если нужно будет через запятую, изменить /n на ,
+    text = f'{lines[0]} {lines[1]}, {lines[2]}, {lines[3]}, {lines[6]}чел. Детское кресло / Бустер: {lines[10]}'
+
+    return text  # Если нужно будет через запятую, изменить /n на ,
 
 def send_telegram_message(token, chat_id, message):
     url = f'https://api.telegram.org/bot{token}/sendMessage'
@@ -110,7 +101,6 @@ def process_mail():
 
                     body = get_email_body(msg)  # Получаем тело письма
 
-                    print(body)
 
                     extracted_text = extract_parts_from_text(body)
 
