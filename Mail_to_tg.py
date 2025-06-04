@@ -16,7 +16,7 @@ MAIL_PASSWORD = '5ssrR7nI4tV1F6byHGkK'  # Пароль от почты(IMAP)
 MAIL_FOLDER = 'Zakaz sayt'  # Имя папки
 
 TELEGRAM_BOT_TOKEN = '8069056826:AAHwdG7ikDBlqZpfn3Rmy9cPXu4U6bHCAOw'  # ID бота
-TELEGRAM_CHAT_ID = '-2567442319'  # ID группы, куда отправлять
+TELEGRAM_CHAT_ID = '-1002567442319'  # ID группы, куда отправлять
 
 POLL_INTERVAL = 60  # проверять почту каждую минуту
 
@@ -29,41 +29,16 @@ def clean_text(text):
     return text
 
 def get_email_body(msg):
-    """Безопасно получить тело письма в формате plain text.
-    Если plain отсутствует, получить и конвертировать html в текст.
-    """
-    body = ''
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
-            content_dispo = str(part.get('Content-Disposition'))
-            # Берём только текстовые части без вложений
-            if content_type == 'text/plain' and 'attachment' not in content_dispo:
-                try:
-                    body = part.get_payload(decode=True).decode()
-                    return body  # plain встретили — возвращаем сразу
-                except:
-                    pass
-        # Если plain не найден, попробуем html
-        for part in msg.walk():
-            content_type = part.get_content_type()
-            content_dispo = str(part.get('Content-Disposition'))
-            if content_type == 'text/html' and 'attachment' not in content_dispo:
-                try:
-                    html = part.get_payload(decode=True).decode()
-                    # Конвертируем html в чистый текст
-                    soup = BeautifulSoup(html, "html.parser")
-                    text = soup.get_text()
-                    return text
-                except:
-                    pass
+            if content_type == "text/plain":
+                body = part.get_payload(decode=True)
+                return clean_text(body)
     else:
-        # Не multipart, просто вытягиваем payload
-        try:
-            body = msg.get_payload(decode=True).decode()
-        except:
-            body = clean_text(msg.get_payload(decode=True))
-    return body
+        body = msg.get_payload(decode=True)
+        return clean_text(body)
+    return ""
 
 def extract_parts_from_text(text):
     lines = text.splitlines()
@@ -134,6 +109,8 @@ def process_mail():
                     from_ = msg.get('From')
 
                     body = get_email_body(msg)  # Получаем тело письма
+
+                    print(body)
 
                     extracted_text = extract_parts_from_text(body)
 
