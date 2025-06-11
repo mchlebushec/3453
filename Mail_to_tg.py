@@ -4,6 +4,7 @@ from email.header import decode_header
 import time
 import requests
 from bs4 import BeautifulSoup
+import smtplib
 
 # --- КОНФИГ ---
 
@@ -49,19 +50,6 @@ def extract_parts_from_text(text):
     text = f'{lines[1]}\n{lines[2]},\n{lines[3]},\n{lines[4]},\n{lines[6]}чел.\n{lines[10]}\n{lines[5]}'
 
     return text  # Если нужно будет через запятую, изменить /n на ,
-def send_telegram_message(token, chat_id, message):
-    url = f'https://api.telegram.org/bot{token}/sendMessage'
-    data = {
-        'chat_id': chat_id,
-        'text': message,
-    }
-    response = requests.post(url, data=data)
-    try:
-        resp_json = response.json()
-    except Exception:
-        resp_json = {'error': 'cannot parse json response'}
-    print('Ответ Telegram API:', resp_json)
-    return response.ok
 
 def send_email(to_email, subject, message):
     try:
@@ -80,6 +68,19 @@ def send_email(to_email, subject, message):
         print(f'Ошибка при отправке письма: {e}')
         return False
 
+def send_telegram_message(token, chat_id, message):
+    url = f'https://api.telegram.org/bot{token}/sendMessage'
+    data = {
+        'chat_id': chat_id,
+        'text': message,
+    }
+    response = requests.post(url, data=data)
+    try:
+        resp_json = response.json()
+    except Exception:
+        resp_json = {'error': 'cannot parse json response'}
+    print('Ответ Telegram API:', resp_json)
+    return response.ok
 
 def list_mail_folders():
     try:
@@ -117,6 +118,7 @@ def process_mail():
         # Уведомление о ошибке
         for mail_id in mail_ids:
             mail.store(mail_id, '+FLAGS', '\\Seen')
+            
             status, msg_data = mail.fetch(mail_id, '(RFC822)')
             if status != 'OK':
                 print(f'Не удалось получить письмо id {mail_id}')
@@ -127,6 +129,9 @@ def process_mail():
                     msg = email.message_from_bytes(response_part[1])
 
                     subject, encoding = decode_header(msg.get('Subject'))[0]
+                    email_sent = send_email(FORWARD_EMAIL, subject, message)
+                    if email_sent:
+                        print(f'Письмо переслано директору.')
                     if isinstance(subject, bytes):
                         try:
                             subject = subject.decode(encoding or 'utf-8')
@@ -139,16 +144,14 @@ def process_mail():
                     extracted_text = extract_parts_from_text(body)
 
                     message = f'{extracted_text}'
-sent = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
-if sent:
-    print(f'Отправлено сообщение для письма id {mail_id.decode()}')
-    # Отправляем копию на email директора
-    email_sent = send_email(FORWARD_EMAIL, f'Пересланное письмо: {subject}', message)
-    if not email_sent:
-        print(f'Не удалось отправить письмо директору для id {mail_id.decode()}')
-else:
-    print(f'Ошибка отправки для письма id {mail_id.decode()}')
 
+                    sent = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
+                    if sent:
+                        print(f'Отправлено сообщение для письма id {mail_id.decode()}')
+
+
+                    else:
+                        print(f'Ошибка отправки для письма id {mail_id.decode()}')
 
         mail.logout()
 
