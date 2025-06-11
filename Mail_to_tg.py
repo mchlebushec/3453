@@ -45,7 +45,7 @@ def extract_parts_from_text(text):
     lines = [': '.join(i.split(': ')[1:]) for i in text.splitlines() if i.count(':') >= 1]
 
     # Выделение нужной части сообщения
-    text = f'{lines[1]}\n{lines[2]},\n{lines[3]},\n{lines[4]},\n{lines[6]}чел.\nДетское кресло / Бустер: {lines[10]}\n{lines[5]}'
+    text = f'{lines[1]}\n{lines[2]},\n{lines[3]},\n{lines[4]},\n{lines[6]}чел.\n{lines[10]}\n{lines[5]}'
 
     return text  # Если нужно будет через запятую, изменить /n на ,
 
@@ -82,6 +82,7 @@ def process_mail():
 
         # Уведомление о ошибке
         for mail_id in mail_ids:
+            mail.store(mail_id, '+FLAGS', '\\Seen')
             status, msg_data = mail.fetch(mail_id, '(RFC822)')
             if status != 'OK':
                 print(f'Не удалось получить письмо id {mail_id}')
@@ -99,7 +100,7 @@ def process_mail():
                             subject = subject.decode('latin1')
                     from_ = msg.get('From')
 
-                    body = get_email_body(msg)  # Получаем тело письма
+                    body = get_email_body(msg)
 
 
                     extracted_text = extract_parts_from_text(body)
@@ -109,6 +110,7 @@ def process_mail():
                     sent = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
                     if sent:
                         print(f'Отправлено сообщение для письма id {mail_id.decode()}')
+
                     else:
                         print(f'Ошибка отправки для письма id {mail_id.decode()}')
 
