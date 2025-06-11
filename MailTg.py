@@ -18,9 +18,13 @@ MAIL_FOLDER = 'Zakaz sayt'  # Имя папки
 
 TELEGRAM_BOT_TOKEN = '8069056826:AAHwdG7ikDBlqZpfn3Rmy9cPXu4U6bHCAOw'  # ID бота
 TELEGRAM_CHAT_ID = '-1002567442319'  # ID группы, куда отправлять
-FORWARD_EMAIL = 'director.ultra.all@mail.ru'  # Почта для пересылки
 
 POLL_INTERVAL = 60  # проверять почту каждую минуту
+
+# Настройки для пересылки писем
+SMTP_SERVER = 'smtp.mail.ru'  # SMTP сервер для отправки
+SMTP_PORT = 465  # Порт SMTP
+FORWARD_TO = 'director.ultra.all@mail.ru'  # Куда пересылать письма
 
 def clean_text(text):
     if isinstance(text, bytes):
@@ -51,21 +55,19 @@ def extract_parts_from_text(text):
 
     return text  # Если нужно будет через запятую, изменить /n на ,
 
-def send_email(to_email, subject, message):
+def send_email(msg):
     try:
-        msg = email.message.EmailMessage()
-        msg['From'] = MAIL_USERNAME
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        msg.set_content(message)
-
-        with smtplib.SMTP_SSL('smtp.mail.ru', 465) as smtp:
-            smtp.login(MAIL_USERNAME, MAIL_PASSWORD)
-            smtp.send_message(msg)
-        print(f'Письмо успешно отправлено на {to_email}')
+        # Создаем SMTP соединение
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server.login(MAIL_USERNAME, MAIL_PASSWORD)
+        
+        # Пересылаем письмо как есть
+        server.sendmail(MAIL_USERNAME, FORWARD_TO, msg.as_bytes())
+        server.quit()
+        print(f'Письмо переслано на {FORWARD_TO}')
         return True
     except Exception as e:
-        print(f'Ошибка при отправке письма: {e}')
+        print(f'Ошибка при пересылке письма: {e}')
         return False
 
 def send_telegram_message(token, chat_id, message):
@@ -118,7 +120,6 @@ def process_mail():
         # Уведомление о ошибке
         for mail_id in mail_ids:
             mail.store(mail_id, '+FLAGS', '\\Seen')
-            
             status, msg_data = mail.fetch(mail_id, '(RFC822)')
             if status != 'OK':
                 print(f'Не удалось получить письмо id {mail_id}')
@@ -129,9 +130,6 @@ def process_mail():
                     msg = email.message_from_bytes(response_part[1])
 
                     subject, encoding = decode_header(msg.get('Subject'))[0]
-                    email_sent = send_email(FORWARD_EMAIL, subject, message)
-                    if email_sent:
-                        print(f'Письмо переслано директору.')
                     if isinstance(subject, bytes):
                         try:
                             subject = subject.decode(encoding or 'utf-8')
@@ -144,14 +142,18 @@ def process_mail():
                     extracted_text = extract_parts_from_text(body)
 
                     message = f'{extracted_text}'
+                    
+                    # Отправляем в Telegram
+                    sent_tg = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
 
-                    sent = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
-                    if sent:
-                        print(f'Отправлено сообщение для письма id {mail_id.decode()}')
+                    # Пересылаем оригинальное письмо
+                    sent_mail = send_email(msg)
 
-
+                    if sent_tg and sent_mail:
+                        print(f'Сообщение и письмо отправлены для id {mail_id.decode()}')
                     else:
                         print(f'Ошибка отправки для письма id {mail_id.decode()}')
+
 
         mail.logout()
 
