@@ -17,6 +17,7 @@ MAIL_FOLDER = 'Zakaz sayt'  # Имя папки
 
 TELEGRAM_BOT_TOKEN = '8069056826:AAHwdG7ikDBlqZpfn3Rmy9cPXu4U6bHCAOw'  # ID бота
 TELEGRAM_CHAT_ID = '-1002567442319'  # ID группы, куда отправлять
+FORWARD_EMAIL = 'director.ultra.all@mail.ru'  # Почта для пересылки
 
 POLL_INTERVAL = 60  # проверять почту каждую минуту
 
@@ -48,7 +49,6 @@ def extract_parts_from_text(text):
     text = f'{lines[1]}\n{lines[2]},\n{lines[3]},\n{lines[4]},\n{lines[6]}чел.\n{lines[10]}\n{lines[5]}'
 
     return text  # Если нужно будет через запятую, изменить /n на ,
-
 def send_telegram_message(token, chat_id, message):
     url = f'https://api.telegram.org/bot{token}/sendMessage'
     data = {
@@ -62,6 +62,40 @@ def send_telegram_message(token, chat_id, message):
         resp_json = {'error': 'cannot parse json response'}
     print('Ответ Telegram API:', resp_json)
     return response.ok
+
+def send_email(to_email, subject, message):
+    try:
+        msg = email.message.EmailMessage()
+        msg['From'] = MAIL_USERNAME
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.set_content(message)
+
+        with smtplib.SMTP_SSL('smtp.mail.ru', 465) as smtp:
+            smtp.login(MAIL_USERNAME, MAIL_PASSWORD)
+            smtp.send_message(msg)
+        print(f'Письмо успешно отправлено на {to_email}')
+        return True
+    except Exception as e:
+        print(f'Ошибка при отправке письма: {e}')
+        return False
+
+
+def list_mail_folders():
+    try:
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+        mail.login(MAIL_USERNAME, MAIL_PASSWORD)
+
+        # Получаем список всех папок
+        status, folders = mail.list()
+        if status == 'OK':
+            print("\nСписок доступных папок:")
+            for folder in folders:
+                print(folder.decode())
+
+        mail.logout()
+    except Exception as e:
+        print('Ошибка при получении списка папок:', e)
 
 # Выбор папки
 def process_mail():
@@ -102,17 +136,19 @@ def process_mail():
 
                     body = get_email_body(msg)
 
-
                     extracted_text = extract_parts_from_text(body)
 
                     message = f'{extracted_text}'
+sent = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
+if sent:
+    print(f'Отправлено сообщение для письма id {mail_id.decode()}')
+    # Отправляем копию на email директора
+    email_sent = send_email(FORWARD_EMAIL, f'Пересланное письмо: {subject}', message)
+    if not email_sent:
+        print(f'Не удалось отправить письмо директору для id {mail_id.decode()}')
+else:
+    print(f'Ошибка отправки для письма id {mail_id.decode()}')
 
-                    sent = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
-                    if sent:
-                        print(f'Отправлено сообщение для письма id {mail_id.decode()}')
-
-                    else:
-                        print(f'Ошибка отправки для письма id {mail_id.decode()}')
 
         mail.logout()
 
@@ -121,6 +157,8 @@ def process_mail():
 
 def main():
     print('Запуск пересылки писем в телеграм...')
+    # Выводим список папок при старте
+    list_mail_folders()
     while True:
         process_mail()
         time.sleep(POLL_INTERVAL)
