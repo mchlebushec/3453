@@ -24,7 +24,6 @@ POLL_INTERVAL = 60  # проверять почту каждую минуту
 # Настройки для пересылки писем
 SMTP_SERVER = 'smtp.mail.ru'  # SMTP сервер для отправки
 SMTP_PORT = 465  # Порт SMTP
-FORWARD_TO = 'director.ultra.all@mail.ru'  # Куда пересылать письма
 
 def clean_text(text):
     if isinstance(text, bytes):
@@ -55,20 +54,6 @@ def extract_parts_from_text(text):
 
     return text  # Если нужно будет через запятую, изменить /n на ,
 
-def send_email(msg):
-    try:
-        # Создаем SMTP соединение
-        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
-        server.login(MAIL_USERNAME, MAIL_PASSWORD)
-        
-        # Пересылаем письмо как есть
-        server.sendmail(MAIL_USERNAME, FORWARD_TO, msg.as_bytes())
-        server.quit()
-        print(f'Письмо переслано на {FORWARD_TO}')
-        return True
-    except Exception as e:
-        print(f'Ошибка при пересылке письма: {e}')
-        return False
 
 def send_telegram_message(token, chat_id, message):
     url = f'https://api.telegram.org/bot{token}/sendMessage'
@@ -145,9 +130,6 @@ def process_mail():
                     
                     # Отправляем в Telegram
                     sent_tg = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
-
-                    # Пересылаем оригинальное письмо
-                    sent_mail = send_email(msg)
 
                     if sent_tg and sent_mail:
                         print(f'Сообщение и письмо отправлены для id {mail_id.decode()}')
